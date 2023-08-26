@@ -28,8 +28,21 @@ pub async fn login(username:web::Path<String>, rq: HttpRequest, conn:Data<DbPool
           }
 
 
-    let opt_authorization = rq.headers().get("Authorization");
+    let opt_auth_header = rq.headers().get("X-WebAuth-User");
+    if !opt_auth_header.is_none() {
+        let username = opt_auth_header.unwrap().to_str();
+        let user =  User::find_by_username(username.unwrap(), conn);
+        if user.is_err() {
+            return Err(CustomError::Forbidden)
+        } else {
+            let session = Session::new(user.unwrap().username);
+            Session::insert_session(&session, conn).expect("Error inserting session");
+            let user_cookie = create_session_cookie(session);
+            return Ok(HttpResponse::Ok().cookie(user_cookie).finish())
+        }
+    }
 
+    let opt_authorization = rq.headers().get("Authorization");
     if opt_authorization.is_none() {
         return Err(CustomError::Forbidden)
     }

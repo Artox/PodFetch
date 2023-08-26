@@ -420,13 +420,13 @@ pub fn check_server_config(service1: EnvironmentService) {
         exit(1);
     }
 
-    if service1.gpodder_integration_enabled && !(service1.http_basic || service1.oidc_configured) {
-        eprintln!("GPODDER_INTEGRATION_ENABLED activated but no BASIC_AUTH or OIDC_AUTH set. Please set BASIC_AUTH or OIDC_AUTH in the .env file.");
+    if service1.gpodder_integration_enabled && !(service1.http_basic || service1.oidc_configured || service1.proxy_auth) {
+        eprintln!("GPODDER_INTEGRATION_ENABLED activated but no PROXY_AUTH, BASIC_AUTH or OIDC_AUTH set. Please set either PROXY_AUTH, BASIC_AUTH or OIDC_AUTH in the .env file.");
         exit(1);
     }
 
-    if service1.http_basic && service1.oidc_configured{
-        eprintln!("You cannot have oidc and basic auth enabled at the same time. Please disable one of them.");
+    if [service1.http_basic, service1.oidc_configured, service1.proxy_auth].iter().filter(|b| **b).count() > 1{
+        eprintln!("You cannot have more than one of proxy, oidc and basic auth enabled at the same time. Please disable two of them.");
         exit(1);
     }
 

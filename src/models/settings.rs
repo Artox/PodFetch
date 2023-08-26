@@ -35,7 +35,8 @@ pub struct ConfigModel {
     pub server_url: String,
     pub basic_auth: bool,
     pub oidc_configured: bool,
-    pub oidc_config: Option<OidcConfig>
+    pub oidc_config: Option<OidcConfig>,
+    pub proxy_auth: bool
 }
 
 

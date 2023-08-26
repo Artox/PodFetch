@@ -16,7 +16,7 @@ use jsonwebtoken::{Algorithm, decode, DecodingKey, Validation};
 use jsonwebtoken::jwk::Jwk;
 use log::info;
 use serde_json::{from_str, Value};
-use crate::constants::inner_constants::{BASIC_AUTH, OIDC_AUTH, PASSWORD, USERNAME};
+use crate::constants::inner_constants::{BASIC_AUTH, OIDC_AUTH, PASSWORD, PROXY_AUTH, USERNAME};
 use crate::{DbPool};
 use crate::models::user::User;
 use sha256::digest;
@@ -74,7 +74,9 @@ impl<S, B> Service<ServiceRequest> for AuthFilterMiddleware<S>
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        return if var(BASIC_AUTH).is_ok() {
+        return if var(PROXY_AUTH).is_ok() {
+            self.handle_proxy_auth(req)
+        } else if var(BASIC_AUTH).is_ok() {
             self.handle_basic_auth(req)
         } else if var(OIDC_AUTH).is_ok() {
             self.handle_oidc_auth(req)
@@ -88,6 +90,30 @@ impl<S, B> Service<ServiceRequest> for AuthFilterMiddleware<S>
 type MyFuture<B, Error> = Pin<Box<dyn Future<Output = Result<ServiceResponse<EitherBody<B>>, Error>>>>;
 
 impl<S, B> AuthFilterMiddleware<S> where B: 'static + MessageBody, S: 'static + Service<ServiceRequest, Response=ServiceResponse<B>, Error=Error>, S::Future: 'static {
+    fn handle_proxy_auth(&self, req: ServiceRequest) -> MyFuture<B, Error> {
+        let opt_auth_header = req.headers().get("X-WebAuth-User");
+        if opt_auth_header.is_none() {
+            return Box::pin(ok(req.error_response(ErrorUnauthorized("Unauthorized")).map_into_right_body()));
+        }
+        let username = opt_auth_header.unwrap().to_str();
+        let res = req.app_data::<web::Data<DbPool>>().unwrap();
+        let found_user = User::find_by_username(username.unwrap(), &mut res.get().unwrap());
+        if found_user.is_err() {
+            return Box::pin(ok(req.error_response(ErrorUnauthorized("Unauthorized"))
+                .map_into_right_body()))
+        }
+        let unwrapped_user = found_user.unwrap();
+        req.extensions_mut().insert(unwrapped_user);
+        let service = Rc::clone(&self.service);
+        async move {
+            service
+                .call(req)
+                .await
+                .map(|res| res.map_into_left_body())
+        }
+            .boxed_local()
+    }
+
     fn handle_basic_auth(&self, req: ServiceRequest) -> MyFuture<B, Error> {
         let opt_auth_header = req.headers().get("Authorization");
         if opt_auth_header.is_none() {

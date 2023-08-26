@@ -87,6 +87,8 @@ pub const OIDC_AUTHORITY:&str = "OIDC_AUTHORITY";
 pub const OIDC_CLIENT_ID:&str = "OIDC_CLIENT_ID";
 pub const OIDC_SCOPE:&str = "OIDC_SCOPE";
 
+pub const PROXY_AUTH:&str = "PROXY_AUTH";
+
 pub const BASIC_AUTH:&str = "BASIC_AUTH";
 
 

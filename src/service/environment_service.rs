@@ -3,7 +3,7 @@ use crate::models::settings::ConfigModel;
 use std::env::var;
 use regex::Regex;
 use crate::config::dbconfig::get_database_url;
-use crate::constants::inner_constants::{BASIC_AUTH, GPODDER_INTEGRATION_ENABLED, OIDC_AUTH, OIDC_AUTHORITY, OIDC_CLIENT_ID, OIDC_REDIRECT_URI, OIDC_SCOPE, PASSWORD, PODINDEX_API_KEY, PODINDEX_API_SECRET, POLLING_INTERVAL, POLLING_INTERVAL_DEFAULT, SERVER_URL, SUB_DIRECTORY, USERNAME};
+use crate::constants::inner_constants::{BASIC_AUTH, GPODDER_INTEGRATION_ENABLED, OIDC_AUTH, OIDC_AUTHORITY, OIDC_CLIENT_ID, OIDC_REDIRECT_URI, OIDC_SCOPE, PASSWORD, PODINDEX_API_KEY, PODINDEX_API_SECRET, POLLING_INTERVAL, POLLING_INTERVAL_DEFAULT, PROXY_AUTH, SERVER_URL, SUB_DIRECTORY, USERNAME};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +26,8 @@ pub struct EnvironmentService {
     pub password: String,
     pub oidc_config: Option<OidcConfig>,
     pub oidc_configured: bool,
-    pub gpodder_integration_enabled: bool
+    pub gpodder_integration_enabled: bool,
+    pub proxy_auth: bool
 }
 
 impl Default for EnvironmentService {
@@ -78,7 +79,8 @@ impl EnvironmentService {
             password: var(PASSWORD).unwrap_or("".to_string()),
             oidc_configured,
             oidc_config: option_oidc_config,
-            gpodder_integration_enabled: var(GPODDER_INTEGRATION_ENABLED).is_ok()
+            gpodder_integration_enabled: var(GPODDER_INTEGRATION_ENABLED).is_ok(),
+            proxy_auth: var(PROXY_AUTH).is_ok()
         }
     }
 
@@ -128,7 +130,8 @@ impl EnvironmentService {
             server_url: self.server_url.clone(),
             basic_auth: self.http_basic,
             oidc_configured: self.oidc_configured,
-            oidc_config: self.oidc_config.clone()
+            oidc_config: self.oidc_config.clone(),
+            proxy_auth: self.proxy_auth
         }
     }
 
@@ -168,6 +171,7 @@ mod tests{
         remove_var(OIDC_AUTHORITY);
         remove_var(OIDC_CLIENT_ID);
         remove_var(OIDC_SCOPE);
+        remove_var(PROXY_AUTH);
     }
 
     #[test]
@@ -177,7 +181,7 @@ mod tests{
 
         set_var(SERVER_URL, "http://localhost:8000");
         set_var(POLLING_INTERVAL, "10");
-        set_var(BASIC_AUTH, "true");
+        set_var(PROXY_AUTH, "true");
         set_var(USERNAME, "test");
         set_var(PASSWORD, "test");
         set_var(OIDC_AUTH, "true");
@@ -185,6 +189,7 @@ mod tests{
         set_var(OIDC_AUTHORITY, "http://localhost:8000/oidc");
         set_var(OIDC_CLIENT_ID, "test");
         set_var(OIDC_SCOPE, "openid profile email");
+        set_var(BASIC_AUTH, "true");
         let mut env_service = EnvironmentService::new();
         let config = env_service.get_config();
         assert!(!config.podindex_configured);
@@ -195,6 +200,7 @@ mod tests{
         assert_eq!(config.oidc_config.clone().unwrap().clone().client_id, "test");
         assert_eq!(config.oidc_config.clone().unwrap().clone().redirect_uri, "http://localhost:8000/oidc");
         assert_eq!(config.oidc_config.clone().unwrap().clone().scope, "openid profile email");
+        assert!(config.proxy_auth);
     }
 
     #[test]
@@ -217,6 +223,7 @@ mod tests{
         set_var(BASIC_AUTH, "true");
         set_var(USERNAME, "test");
         set_var(PASSWORD, "test");
+        set_var(PROXY_AUTH, "true");
         let mut env_service = EnvironmentService::new();
         let config = env_service.get_config();
         assert!(config.podindex_configured);
@@ -224,6 +231,8 @@ mod tests{
         assert_eq!(config.server_url, "http://localhost:8000/");
         assert!(config.basic_auth);
         assert!(!config.oidc_configured);
+        assert!(config.proxy_auth);
+
     }
 
     #[test]
